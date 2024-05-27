@@ -58,7 +58,92 @@ impl StateMachine for Atm {
     type Transition = Action;
 
     fn next_state(starting_state: &Self::State, t: &Self::Transition) -> Self::State {
-        todo!("Exercise 4")
+        match t {
+            Action::SwipeCard(expected_input_key) => {
+                return Self {
+                    cash_inside: starting_state.cash_inside,
+                    expected_pin_hash: Auth::Authenticating(*expected_input_key),
+                    keystroke_register: starting_state.keystroke_register.clone()
+                }
+            },
+            Action::PressKey(input_key) => {
+                match starting_state.expected_pin_hash {
+                    Auth::Waiting => {
+                        return Self {
+                            cash_inside: starting_state.cash_inside,
+                            expected_pin_hash: Auth::Waiting,
+                            keystroke_register: Vec::new()
+                        }
+                    },
+                    Auth::Authenticating(key_hash) => {
+                        match input_key {
+                            Key::Enter => {
+                                let atm_pin = starting_state.keystroke_register.clone();
+                                if key_hash == crate::hash(&atm_pin) {
+                                    return Self {
+                                        cash_inside: starting_state.cash_inside,
+                                        expected_pin_hash: Auth::Authenticated,
+                                        keystroke_register: Vec::new()
+                                    }
+                                }
+                                return  Self {
+                                    cash_inside: starting_state.cash_inside,
+                                    expected_pin_hash: Auth::Waiting,
+                                    keystroke_register: Vec::new()
+                                };
+                            },
+                            _ => {
+                                let mut ne_f = starting_state.keystroke_register.clone();
+                                ne_f.push(input_key.clone());
+                                return Self {
+                                    cash_inside: starting_state.cash_inside,
+                                    expected_pin_hash: starting_state.expected_pin_hash.clone(),
+                                    keystroke_register: ne_f
+                                }
+                            }
+                        }
+                    },
+                    Auth::Authenticated => {
+                        match input_key {
+                            Key::Enter => {
+                                let sim: String = starting_state.keystroke_register.clone().iter().map(|k| match k {
+                                    Key::One => '1'.to_string(),
+                                    Key::Two => '2'.to_string(),
+                                    Key::Three => '3'.to_string(),
+                                    Key::Four => '4'.to_string(),
+                                    Key::Enter => String::from("")
+                                }).collect();
+                                let amount = sim.parse::<u64>().unwrap_or(0);
+                                print!("go and do.. {}", amount);
+                                if amount > starting_state.cash_inside {
+                                    return Self {
+                                        cash_inside: starting_state.cash_inside,
+                                        expected_pin_hash: Auth::Waiting,
+                                        keystroke_register: Vec::new()
+                                    };
+                                }
+
+                                return Self {
+                                    cash_inside: starting_state.cash_inside - amount,
+                                    expected_pin_hash: Auth::Waiting,
+                                    keystroke_register: Vec::new()
+                                };
+
+                            },
+                            _ => {
+                                let mut ne_f = starting_state.keystroke_register.clone();
+                                ne_f.push(input_key.clone());
+                                return Self {
+                                    cash_inside: starting_state.cash_inside,
+                                    expected_pin_hash: starting_state.expected_pin_hash.clone(),
+                                    keystroke_register: ne_f
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
